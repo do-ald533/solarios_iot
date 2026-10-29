@@ -1,0 +1,78 @@
+name: Solaris IoT CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # --- 1. LINTING & STATIC ANALYSIS ---
+  lint:
+    name: Lint & Static Code Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO Core
+        run: pip install platformio
+
+      - name: Inject Mock Configuration
+        run: cp include/config.example.h include/config.h
+
+      - name: Run Static Code Analysis (Cppcheck)
+        run: pio check --skip-packages --fail-on-defect=HIGH
+
+  # --- 2. UNIT TESTING ---
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO Core
+        run: pip install platformio
+
+      - name: Inject Mock Configuration
+        run: cp include/config.example.h include/config.h
+
+      - name: Execute Native Unit Tests
+        run: pio test -e native
+
+  # --- 3. FIRMWARE BUILD ---
+  build:
+    name: Compile ESP32 Firmware
+    needs: [lint, test] # Executes only if lint and test jobs succeed
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO Core
+        run: pip install platformio
+
+      - name: Inject Mock Configuration
+        run: cp include/config.example.h include/config.h
+
+      - name: Build ESP32 Firmware Binary
+        run: pio run -e esp32dev

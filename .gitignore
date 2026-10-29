@@ -1,0 +1,33 @@
+# Secret configuration file containing live API keys and Wi-Fi credentials
+include/config.h
+
+# PlatformIO build outputs, local libraries, and cached environments
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Ignore all VS Code local workspace files by default...
+.vscode/*
+
+# ...except workspace extension recommendations and shared launch configs
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# Compiled binaries and firmware images
+build/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+
+# Environment variable files
+.env
+*.env
+
+# Operating System system files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
