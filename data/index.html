@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solaris IoT Control Center</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Solaris IoT</h1>
+            <span id="conn-status" class="badge disconnected">Disconnected</span>
+        </header>
+
+        <main>
+            <!-- Room Occupancy & Visits -->
+            <section class="card status-card">
+                <h2>Room State</h2>
+                <div id="occupancy-state" class="state-box vacant">VACANT</div>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <span class="label">Visits Today</span>
+                        <span id="visit-count" class="value">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Active Visit Duration</span>
+                        <span id="active-timer" class="value">00:00</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Hardware Controls -->
+            <section class="card control-card">
+                <h2>Interactive Controls</h2>
+                <div class="control-group">
+                    <label>LED Mode</label>
+                    <div class="btn-group">
+                        <button class="btn mode-btn" data-mode="AUTO">AUTO</button>
+                        <button class="btn mode-btn" data-mode="FORCE_ON">FORCE ON</button>
+                        <button class="btn mode-btn" data-mode="FORCE_OFF">FORCE OFF</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="timeout-slider">Motion Timeout: <span id="timeout-val">10</span>s</label>
+                    <input type="range" id="timeout-slider" min="3" max="60" value="10">
+                </div>
+            </section>
+
+            <!-- Telemetry & Health -->
+            <section class="card telemetry-card">
+                <h2>System Health</h2>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <span class="label">Wi-Fi Signal (RSSI)</span>
+                        <span id="wifi-rssi" class="value">-- dBm</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Free Heap Memory</span>
+                        <span id="free-heap" class="value">-- KB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">System Uptime</span>
+                        <span id="system-uptime" class="value">--</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Last Sync Timestamp</span>
+                        <span id="last-sync" class="value">--</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

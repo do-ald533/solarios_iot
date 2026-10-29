@@ -1,18 +1,24 @@
 #pragma once
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
+#include <ArduinoJson.h>
+#include <functional>
 
-class WebServerManager
-{
+using CommandCallback = std::function<void(const String& command, const JsonVariant& value)>;
+
+class WebServerManager {
 public:
     explicit WebServerManager(uint16_t port);
-    void begin();
-    void broadcastStatus(bool isOccupied, uint32_t visitCount, const String &lastEntry);
+    
+    void begin(CommandCallback onCommandReceived);
+    void broadcastTelemetry(bool occupied, uint32_t visitCount, const String& timestamp, 
+                           uint32_t activeVisitSec, uint32_t timeoutSec, const String& ledMode);
 
 private:
-    AsyncWebServer _server;
-    AsyncWebSocket _ws;
+    AsyncWebServer server;
+    AsyncWebSocket ws;
+    CommandCallback commandHandler;
 
-    void setupRoutes();
-    void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
+    void onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, 
+                        AwsEventType type, void* arg, uint8_t* data, size_t len);
 };

@@ -1,89 +1,66 @@
 #include "WebServerManager.h"
+#include <LittleFS.h>
+#include <WiFi.h>
+#include "logger/Logger.h"
 
-// HTML, CSS, and JS bundle stored directly in ESP32 Flash memory
-static const char INDEX_HTML[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Solaris IoT - Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; margin: 0; padding: 20px; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; margin: 15px auto; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .status { font-size: 24px; font-weight: bold; padding: 10px; border-radius: 6px; }
-        .occupied { background: #e53935; color: white; }
-        .free { background: #43a047; color: white; }
-        .metric { font-size: 36px; color: #00bcd4; margin: 10px 0; }
-    </style>
-</head>
-<body>
-    <h2>Solaris IoT Control Panel</h2>
-    <div class="card">
-        <h3>Occupancy Status</h3>
-        <div id="status" class="status free">VACANT</div>
-    </div>
-    <div class="card">
-        <h3>Daily Visits</h3>
-        <div id="visits" class="metric">0</div>
-    </div>
-    <div class="card">
-        <h3>Last Motion Detected</h3>
-        <p id="lastEntry">None</p>
-    </div>
+static const char* TAG = "WebServer";
 
-    <script>
-        var gateway = `ws://${window.location.hostname}/ws`;
-        var websocket;
+WebServerManager::WebServerManager(uint16_t port) 
+    : server(port), ws("/ws") {}
 
-        function initWebSocket() {
-            websocket = new WebSocket(gateway);
-            websocket.onmessage = onMessage;
-            websocket.onclose = function() { setTimeout(initWebSocket, 2000); };
-        }
+void WebServerManager::begin(CommandCallback onCommandReceived) {
+    this->commandHandler = onCommandReceived;
 
-        function onMessage(event) {
-            var data = JSON.parse(event.data);
-            var statusDiv = document.getElementById('status');
-            
-            if (data.occupied) {
-                statusDiv.className = 'status occupied';
-                statusDiv.innerText = 'OCCUPIED';
-            } else {
-                statusDiv.className = 'status free';
-                statusDiv.innerText = 'VACANT';
+    if (!LittleFS.begin(true)) {
+        Logger::error(TAG, "Failed to mount LittleFS filesystem!");
+        return;
+    }
+    Logger::info(TAG, "LittleFS mounted successfully.");
+
+    ws.onEvent([this](AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len) {
+        this->onWebSocketEvent(server, client, type, arg, data, len);
+    });
+    
+    server.addHandler(&ws);
+    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+
+    server.begin();
+    Logger::info(TAG, "HTTP Server started on port 80.");
+}
+
+void WebServerManager::onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, 
+                                      AwsEventType type, void* arg, uint8_t* data, size_t len) {
+    if (type == WS_EVT_CONNECT) {
+        Logger::info(TAG, "WebSocket client connected: %u", client->id());
+    } else if (type == WS_EVT_DATA) {
+        AwsFrameInfo* info = (AwsFrameInfo*)arg;
+        if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (!err && commandHandler) {
+                const char* cmd = doc["command"];
+                commandHandler(String(cmd), doc["value"]);
             }
-
-            document.getElementById('visits').innerText = data.visits;
-            if(data.lastEntry) document.getElementById('lastEntry').innerText = data.lastEntry;
         }
-
-        window.addEventListener('load', initWebSocket);
-    </script>
-</body>
-</html>
-)rawliteral";
-
-WebServerManager::WebServerManager(uint16_t port)
-    : _server(port), _ws("/ws") {}
-
-void WebServerManager::begin()
-{
-    setupRoutes();
-    _server.addHandler(&_ws);
-    _server.begin();
-    Serial.println("[WebServer] Local Async WebServer started on port 80.");
+    }
 }
 
-void WebServerManager::setupRoutes()
-{
-    _server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send_P(200, "text/html", INDEX_HTML); });
-}
+void WebServerManager::broadcastTelemetry(bool occupied, uint32_t visitCount, const String& timestamp, 
+                                       uint32_t activeVisitSec, uint32_t timeoutSec, const String& ledMode) {
+    if (ws.count() == 0) return;
 
-void WebServerManager::broadcastStatus(bool isOccupied, uint32_t visitCount, const String &lastEntry)
-{
-    String json = "{\"occupied\":" + String(isOccupied ? "true" : "false") +
-                  ",\"visits\":" + String(visitCount) +
-                  ",\"lastEntry\":\"" + lastEntry + "\"}";
-    _ws.textAll(json);
+    JsonDocument doc;
+    doc["occupied"] = occupied;
+    doc["visitCount"] = visitCount;
+    doc["timestamp"] = timestamp;
+    doc["activeVisitSec"] = activeVisitSec;
+    doc["rssi"] = WiFi.RSSI();
+    doc["freeHeap"] = ESP.getFreeHeap();
+    doc["uptimeSec"] = millis() / 1000;
+    doc["ledTimeoutSec"] = timeoutSec;
+    doc["ledMode"] = ledMode;
+
+    String jsonBuffer;
+    serializeJson(doc, jsonBuffer);
+    ws.textAll(jsonBuffer);
 }
